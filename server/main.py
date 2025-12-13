@@ -2,13 +2,19 @@ from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-import uvicorn
+import uvicorn, re
 
 from server.modules.extract_email import extract_email_fields
 from server.model_predict import predict_email
 from server.quarantine import save_to_quarantine
 
 app = FastAPI()
+
+def highlight_keywords(text: str, keywords: list):
+    for kw in keywords:
+        pattern = re.compile(rf"\b({re.escape(kw)})\b", re.IGNORECASE)
+        text = pattern.sub(r"<mark>\1</mark>", text)
+    return text
 
 app.mount("/static", StaticFiles(directory="server/static"), name="static")
 templates = Jinja2Templates(directory="server/templates")

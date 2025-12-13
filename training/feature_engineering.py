@@ -1,23 +1,28 @@
 import re
+from bs4 import BeautifulSoup
+import warnings
+from bs4 import MarkupResemblesLocatorWarning
+
+warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
+
 
 def clean_text(text: str) -> str:
     if not isinstance(text, str):
         return ""
 
-    # lowercase
     text = text.lower()
 
-    # remove URLs
-    text = re.sub(r"http[s]?://\S+", " url ", text)
+    # remove html
+    text = BeautifulSoup(text, "lxml").get_text(" ")
+
+    # remove urls
+    text = re.sub(r"http\S+|www\S+", " URL ", text)
 
     # remove emails
-    text = re.sub(r"\S+@\S+", " email ", text)
+    text = re.sub(r"\S+@\S+", " EMAIL ", text)
 
-    # remove html tags (simple)
-    text = re.sub(r"<.*?>", " ", text)
-
-    # keep only letters/numbers
-    text = re.sub(r"[^a-z0-9 ]", " ", text)
+    # keep words only
+    text = re.sub(r"[^a-z\s]", " ", text)
 
     # normalize spaces
     text = re.sub(r"\s+", " ", text).strip()

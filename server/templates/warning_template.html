@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>⚠ Phishing Warning</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #fff3f3;
+            padding: 30px;
+        }
+        .box {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            max-width: 800px;
+            margin: auto;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: red;
+        }
+        mark {
+            background: yellow;
+            font-weight: bold;
+        }
+        .risk {
+            font-size: 20px;
+            color: red;
+            font-weight: bold;
+        }
+        .meta p {
+            margin: 5px 0;
+        }
+        pre {
+            background: #f6f6f6;
+            padding: 15px;
+            white-space: pre-wrap;
+        }
+        button {
+            padding: 10px 20px;
+            background: orange;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>⚠ WARNING: Phishing Email Detected</h2>
+
+    <div class="meta">
+        <p><strong>From:</strong> {{ sender }}</p>
+        <p><strong>Subject:</strong> {{ subject }}</p>
+        <p class="risk">Risk Score: {{ risk }}%</p>
+        <p><strong>Suspicious Keywords:</strong> {{ keywords }}</p>
+    </div>
+
+    <hr>
+
+    <h3>Email Content</h3>
+    <pre>{{ body | safe }}</pre>
+
+    <form action="/force-open" method="post">
+        <input type="hidden" name="content" value="{{ raw_email | replace('"', "'") }}">
+        <button>Read Anyway</button>
+    </form>
+</div>
+
+</body>
+</html>

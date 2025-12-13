@@ -1,6 +1,9 @@
+# server/model_predict.py
+
 import pickle
-from training.feature_engineering import clean_text
-from server.modules.extract_email import extract_email_fields
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 MODEL_PATH = "model/email_phishing_model.pkl"
 VECTORIZER_PATH = "model/tfidf_vectorizer.pkl"
@@ -9,33 +12,42 @@ VECTORIZER_PATH = "model/tfidf_vectorizer.pkl"
 class EmailPhishingModel:
     def __init__(self):
         with open(MODEL_PATH, "rb") as f:
-            self.model = pickle.load(f)
+            self.model: LogisticRegression = pickle.load(f)
 
         with open(VECTORIZER_PATH, "rb") as f:
-            self.vectorizer = pickle.load(f)
+            self.vectorizer: TfidfVectorizer = pickle.load(f)
 
-    def predict(self, text: str):
+        self.feature_names = np.array(
+            self.vectorizer.get_feature_names_out()
+        )
+
+    def predict_with_explanation(self, text: str):
         X = self.vectorizer.transform([text])
-        pred = self.model.predict(X)[0]
+
         prob = self.model.predict_proba(X)[0][1]
-        return pred, float(prob)
+        label = "phishing" if prob >= 0.5 else "legitimate"
+
+        tfidf_values = X.toarray()[0]
+        weights = self.model.coef_[0]
+
+        contribution = tfidf_values * weights
+        top_idx = np.argsort(contribution)[-10:][::-1]
+
+        keywords = [
+            self.feature_names[i]
+            for i in top_idx
+            if contribution[i] > 0
+        ]
+
+        return {
+            "label": label,
+            "risk_score": round(prob * 100, 2),
+            "keywords": keywords
+        }
 
 
-model = EmailPhishingModel()
+_model = EmailPhishingModel()
 
 
-def predict_email(fields: dict):
-    """
-    fields = { "subject": "...", "from": "...", "body": "..." }
-    """
-    full_text = f"{fields.get('subject','')}\n{fields.get('from','')}\n{fields.get('body','')}"
-    cleaned = clean_text(full_text)
-
-    label, prob = model.predict(cleaned)
-
-    return {
-        "prediction": label,
-        "probability": round(prob, 4),
-        "subject": fields.get("subject", ""),
-        "from": fields.get("from", ""),
-    }
+def predict_email(text: str):
+    return _model.predict_with_explanation(text)

@@ -1,0 +1,34 @@
+@app.post("/upload-email")
+async def upload_email(email_file: UploadFile = File(...)):
+    raw_data = (await email_file.read()).decode("utf-8", errors="ignore")
+
+    # Extract dict format
+    fields = extract_email_fields(raw_data)
+
+    subject = fields.get("subject", "")
+    body = fields.get("body", "")
+    urls = fields.get("urls", [])
+    attachments = fields.get("attachments", [])
+
+    # Run prediction
+    result = predict_email(body)
+
+    # If phishing
+    if result == "phishing":
+        save_to_quarantine(raw_data)
+        return HTMLResponse(f"""
+        <h2 style="color:red;">⚠ WARNING: This email appears to be PHISHING!</h2>
+        <p><b>Subject:</b> {subject}</p>
+
+        <form action="/force-open" method="post">
+            <input type="hidden" name="content" value="{raw_data.replace('"', "'")}">
+            <button style="background-color:orange;padding:10px;">Read Anyway</button>
+        </form>
+        """)
+
+    # Safe email
+    return HTMLResponse(f"""
+        <h2 style="color:green;">✔ SAFE EMAIL</h2>
+        <h3>{subject}</h3>
+        <pre>{body}</pre>
+    """)

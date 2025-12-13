@@ -1,115 +1,79 @@
 import os
 import pandas as pd
-import pickle
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+from joblib import dump
 
 from training.feature_engineering import clean_text
 
-# ===============================
-#  CONFIG
-# ===============================
-PH_DIR = "dataset/PHISHING"
+PHISHING_DIR = "dataset/PHISHING"
 HAM_DIR = "dataset/HAM"
 
 MODEL_PATH = "model/email_phishing_model.pkl"
-VEC_PATH = "model/tfidf_vectorizer.pkl"
+VECTORIZER_PATH = "model/tfidf_vectorizer.pkl"
 
-MAX_FEATURES = 20000     # ultra-low-RAM TF-IDF
-
-
-def load_csv_safe(path):
-    """Try to load a CSV safely."""
-    try:
-        print(f"[LOAD] {path}")
-        df = pd.read_csv(path)
-        return df
-    except Exception as e:
-        print(f"[ERROR] Failed {path}: {e}")
-        return None
+TARGET_ROWS_PER_CLASS = 150000   # ใช้ RAM ใหม่ให้คุ้ม 😄
 
 
-def load_all():
-    phishing_df_list = []
-    ham_df_list = []
+def normalize_dataframe(df):
+    cols = df.columns
 
-    # PHISHING
-    for file in os.listdir(PH_DIR):
-        fpath = os.path.join(PH_DIR, file)
-        df = load_csv_safe(fpath)
-        if df is not None:
-            phishing_df_list.append(df)
+    if "text_combined" in cols:
+        return pd.DataFrame({
+            "text": df["text_combined"].astype(str),
+            "label": df["label"].astype(int)
+        })
 
-    # HAM
-    for file in os.listdir(HAM_DIR):
-        fpath = os.path.join(HAM_DIR, file)
-        df = load_csv_safe(fpath)
-        if df is not None:
-            ham_df_list.append(df)
+    subject = df["subject"].astype(str) if "subject" in cols else ""
+    body = df["body"].astype(str) if "body" in cols else ""
 
-    phishing = pd.concat(phishing_df_list, ignore_index=True)
-    ham = pd.concat(ham_df_list, ignore_index=True)
+    return pd.DataFrame({
+        "text": subject + " " + body,
+        "label": df["label"].astype(int)
+    })
 
-    # unify columns
-    def unify(df):
-        # Try to get subject+body
-        if "text_combined" in df:
-            df["text"] = df["text_combined"]
-        else:
-            subj = df["subject"] if "subject" in df else ""
-            body = df["body"] if "body" in df else ""
-            df["text"] = subj.astype(str) + " " + body.astype(str)
 
-        df["label"] = df["label"].astype(int)
-        return df[["text", "label"]]
+def load_folder(folder):
+    dfs = []
+    for f in os.listdir(folder):
+        if f.endswith(".csv"):
+            path = os.path.join(folder, f)
+            print(f"[LOAD] {path}")
+            df = pd.read_csv(path, encoding="latin1")
+            dfs.append(normalize_dataframe(df))
+    return dfs
 
-    return unify(phishing), unify(ham)
+
+def balanced_sample(df, target):
+    return df.sample(target, random_state=42) if len(df) > target else df
 
 
 def train_model():
-    print("\n==============================")
-    print("  [1] Loading datasets...")
-    print("==============================")
+    print("\n[1] Loading datasets...")
 
-    phishing, ham = load_all()
+    phishing = pd.concat(load_folder(PHISHING_DIR), ignore_index=True)
+    ham = pd.concat(load_folder(HAM_DIR), ignore_index=True)
 
-    print(f"[INFO] PHISH rows = {len(phishing)}")
-    print(f"[INFO] HAM rows   = {len(ham)}")
+    phishing = balanced_sample(phishing, TARGET_ROWS_PER_CLASS)
+    ham = balanced_sample(ham, TARGET_ROWS_PER_CLASS)
 
-    # ==============================
-    # [2] Balance dataset (RAM-safe)
-    # ==============================
-    print("\n==============================")
-    print("  [2] Balancing...")
-    print("==============================")
+    df = pd.concat([phishing, ham], ignore_index=True)
+    df = df.sample(frac=1, random_state=42)  # shuffle
 
-    # sample HAM to match phishing count *0.5 (more stable)
-    HAM_TARGET = min(len(ham), len(phishing) // 2)
-    ham_bal = ham.sample(HAM_TARGET, random_state=42)
+    print(f"[INFO] Total rows = {len(df):,}")
 
-    df = pd.concat([phishing, ham_bal], ignore_index=True)
-    print(f"[INFO] Final rows = {len(df)}")
+    print("\n[2] Cleaning text...")
+    df["text"] = df["text"].apply(clean_text)
 
-    # ==============================
-    # [3] Clean text (Light mode)
-    # ==============================
-    print("\n==============================")
-    print("  [3] Cleaning text...")
-    print("==============================")
-
-    df["text"] = df["text"].astype(str).apply(clean_text)
-
-    # ==============================
-    # [4] TF-IDF
-    # ==============================
-    print("\n==============================")
-    print("  [4] TF-IDF Vectorizing...")
-    print("==============================")
-
+    print("\n[3] TF-IDF Vectorizing...")
     vectorizer = TfidfVectorizer(
-        max_features=MAX_FEATURES,
-        ngram_range=(1,2),
+        max_features=80000,
+        ngram_range=(1, 2),
+        stop_words="english",
+        min_df=3,
+        max_df=0.95,
         sublinear_tf=True
     )
 
@@ -118,31 +82,30 @@ def train_model():
 
     print(f"[INFO] Vector shape = {X.shape}")
 
-    # ==============================
-    # [5] Train Logistic Regression
-    # ==============================
-    print("\n==============================")
-    print("  [5] Training Logistic Regression...")
-    print("==============================")
+    print("\n[4] Train / Test split...")
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
 
-    model = LogisticRegression(max_iter=1500)
-    model.fit(X, y)
+    print("\n[5] Training Logistic Regression...")
+    model = LogisticRegression(
+        max_iter=3000,
+        solver="saga",
+        class_weight="balanced",
+        n_jobs=-1
+    )
 
-    # ==============================
-    # [6] Save files
-    # ==============================
-    print("\n==============================")
-    print("  [6] Saving model & vectorizer...")
-    print("==============================")
+    model.fit(X_train, y_train)
 
-    with open(MODEL_PATH, "wb") as f:
-        pickle.dump(model, f)
+    print("\n[6] Evaluation:")
+    preds = model.predict(X_test)
+    print(classification_report(y_test, preds))
 
-    with open(VEC_PATH, "wb") as f:
-        pickle.dump(vectorizer, f)
+    print("\n[7] Saving model...")
+    dump(model, MODEL_PATH)
+    dump(vectorizer, VECTORIZER_PATH)
 
-    print(f"[OK] Saved model: {MODEL_PATH}")
-    print(f"[OK] Saved vectorizer: {VEC_PATH}")
+    print("\n🎉 Training completed (HIGH ACCURACY MODE)")
 
 
 if __name__ == "__main__":
