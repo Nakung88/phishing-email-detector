@@ -1,18 +1,50 @@
-# ignore all model files
-model/*
-!model/.gitkeep
-
-# ignore quarantine files
-quarantine/*
-!quarantine/.gitkeep
-
-# ignore dataset but keep folder
-dataset/*
-!dataset/.gitkeep
-
-# venv
-venv/
-
-# cache
+####################################
+# Python
+####################################
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+####################################
+# Virtual Environment
+####################################
+venv/
+.venv/
+.env/
+
+####################################
+# Dataset (DO NOT COMMIT)
+####################################
+dataset/
+
+####################################
+# Runtime generated files
+####################################
+quarantine/*.txt
+logs/
+*.log
+
+####################################
+# OS files
+####################################
+.DS_Store
+Thumbs.db
+desktop.ini
+
+####################################
+# IDEs
+####################################
+.vscode/
+.idea/
+
+####################################
+# Jupyter
+####################################
+.ipynb_checkpoints/
+
+####################################
+# Build
+####################################
+build/
+dist/
+*.egg-info/
