@@ -1,15 +1,18 @@
-# Virtual env
+# ignore all model files
+model/*
+!model/.gitkeep
+
+# ignore quarantine files
+quarantine/*
+!quarantine/.gitkeep
+
+# ignore dataset but keep folder
+dataset/*
+!dataset/.gitkeep
+
+# venv
 venv/
 
-# Model files
-model/*.pkl
-
-# Dataset (IMPORTANT)
-dataset/
-
-# Cache
+# cache
 __pycache__/
 *.pyc
-
-# OS
-.DS_Store
