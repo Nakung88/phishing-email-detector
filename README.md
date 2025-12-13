@@ -1,4 +1,4 @@
-## Downlosd dataset
+## Download dataset
 https://drive.google.com/drive/folders/1OliwFz1mdIodn4URpOlEbWYxyXyOw_hg?usp=sharing
 
 
