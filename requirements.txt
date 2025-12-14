@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+jinja2
+python-multipart
+
+numpy
+pandas
+scikit-learn
+scipy
+joblib
+
+nltk
+regex
+beautifulsoup4
+lxml
