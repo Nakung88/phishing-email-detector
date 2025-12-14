@@ -1,20 +1,13 @@
-from fastapi import FastAPI, UploadFile, File, Form, Request
+# server/main.py
+from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-import uvicorn, re
+from fastapi.staticfiles import StaticFiles
 
 from server.modules.extract_email import extract_email_fields
 from server.model_predict import predict_email
-from server.quarantine import save_to_quarantine
 
 app = FastAPI()
-
-def highlight_keywords(text: str, keywords: list):
-    for kw in keywords:
-        pattern = re.compile(rf"\b({re.escape(kw)})\b", re.IGNORECASE)
-        text = pattern.sub(r"<mark>\1</mark>", text)
-    return text
 
 app.mount("/static", StaticFiles(directory="server/static"), name="static")
 templates = Jinja2Templates(directory="server/templates")
@@ -25,47 +18,20 @@ async def home(request: Request):
     return templates.TemplateResponse("upload.html", {"request": request})
 
 
-@app.post("/upload-email")
-async def upload_email(email_file: UploadFile = File(...)):
+@app.post("/upload-email", response_class=HTMLResponse)
+async def upload_email(request: Request, email_file: UploadFile = File(...)):
     raw = (await email_file.read()).decode("utf-8", errors="ignore")
-
     fields = extract_email_fields(raw)
 
-    subject = fields.get("subject", "")
-    from_field = fields.get("from", "")
-    body = fields.get("body", "")
-
-    # ⬇⬇⬇ สำคัญมาก — ส่ง FULL TEXT เข้าโมเดล
-    full_text = subject + "\n" + from_field + "\n" + body
+    full_text = f"{fields['subject']} {fields['from']} {fields['body']}"
 
     result = predict_email(full_text)
 
-    if result == "phishing":
-        save_to_quarantine(raw)
-        return HTMLResponse(f"""
-            <h2 style="color:red;">⚠ WARNING: Email appears to be PHISHING</h2>
-            <p><b>Subject:</b> {subject}</p>
-
-            <form action="/force-open" method="post">
-                <input type="hidden" name="content" value="{raw.replace('"','\'')}">
-                <button style="background-color:orange;padding:10px;">Read Anyway</button>
-            </form>
-        """)
-
-    return HTMLResponse(f"""
-        <h2 style="color:green;">✔ SAFE EMAIL</h2>
-        <h3>{subject}</h3>
-        <pre>{body}</pre>
-    """)
-
-
-@app.post("/force-open")
-async def force_open(content: str = Form(...)):
-    return HTMLResponse(f"""
-        <h2 style="color:orange;">⚠ Viewing flagged email</h2>
-        <pre>{content}</pre>
-    """)
-
-
-if __name__ == "__main__":
-    uvicorn.run("server.main:app", host="127.0.0.1", port=8000, reload=True)
+    return templates.TemplateResponse(
+        "warning_template.html",
+        {
+            "request": request,
+            "result": result,
+            "subject": fields["subject"],
+        },
+    )

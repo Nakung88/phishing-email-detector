@@ -1,34 +1,22 @@
-@app.post("/upload-email")
-async def upload_email(email_file: UploadFile = File(...)):
-    raw_data = (await email_file.read()).decode("utf-8", errors="ignore")
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Email Phishing Detector</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
 
-    # Extract dict format
-    fields = extract_email_fields(raw_data)
+<h1>📧 Email Phishing Detector</h1>
 
-    subject = fields.get("subject", "")
-    body = fields.get("body", "")
-    urls = fields.get("urls", [])
-    attachments = fields.get("attachments", [])
+<form action="/upload-email" method="post" enctype="multipart/form-data">
+    <p>Upload .eml file</p>
 
-    # Run prediction
-    result = predict_email(body)
+    <!-- ⚠️ ชื่อนี้ต้องตรงกับ email_file -->
+    <input type="file" name="email_file" accept=".eml" required>
 
-    # If phishing
-    if result == "phishing":
-        save_to_quarantine(raw_data)
-        return HTMLResponse(f"""
-        <h2 style="color:red;">⚠ WARNING: This email appears to be PHISHING!</h2>
-        <p><b>Subject:</b> {subject}</p>
+    <br><br>
+    <button type="submit">Scan Email</button>
+</form>
 
-        <form action="/force-open" method="post">
-            <input type="hidden" name="content" value="{raw_data.replace('"', "'")}">
-            <button style="background-color:orange;padding:10px;">Read Anyway</button>
-        </form>
-        """)
-
-    # Safe email
-    return HTMLResponse(f"""
-        <h2 style="color:green;">✔ SAFE EMAIL</h2>
-        <h3>{subject}</h3>
-        <pre>{body}</pre>
-    """)
+</body>
+</html>
