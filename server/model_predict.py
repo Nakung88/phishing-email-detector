@@ -1,6 +1,5 @@
 import joblib
 import re
-import numpy as np
 from pathlib import Path
 
 # ===============================
@@ -8,83 +7,81 @@ from pathlib import Path
 # ===============================
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-MODEL_PATH = BASE_DIR / "model" / "email_phishing_model.pkl"
-VECTORIZER_PATH = BASE_DIR / "model" / "tfidf_vectorizer.pkl"
-
-model = joblib.load(MODEL_PATH)
-vectorizer = joblib.load(VECTORIZER_PATH)
+model = joblib.load(BASE_DIR / "model" / "email_phishing_model.pkl")
+vectorizer = joblib.load(BASE_DIR / "model" / "tfidf_vectorizer.pkl")
 
 # ===============================
-# Config
+# Thresholds
 # ===============================
-PHISHING_THRESHOLD = 0.75  # ปรับได้ (0.7–0.8 แนะนำ)
+PHISHING_THRESHOLD = 0.70
+STRONG_PHISHING_THRESHOLD = 0.85  # ถ้าเกินนี้ = phishing แน่นอน
+
+# ===============================
+# Indicators
+# ===============================
+PHISHING_KEYWORDS = [
+    "verify your account",
+    "urgent",
+    "suspend",
+    "unusual activity",
+    "confirm your identity",
+    "security alert",
+    "click below",
+    "reset your password",
+]
 
 TRUSTED_DOMAINS = [
     "microsoft.com",
-    "login.microsoftonline.com",
     "github.com",
     "google.com",
     "accounts.google.com",
-    "facebook.com"
 ]
 
 # ===============================
-# Helper functions
+# Helpers
 # ===============================
 def clean_text(text: str) -> str:
-    """
-    ทำความสะอาดข้อความก่อนส่งเข้าโมเดล
-    - ลบ URL
-    - ลบตัวอักษรแปลก
-    """
     text = text.lower()
-    text = re.sub(r"http\S+", " ", text)   # remove URLs
+    text = re.sub(r"http\S+", " ", text)
     text = re.sub(r"[^a-z0-9\s]", " ", text)
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
+    return re.sub(r"\s+", " ", text).strip()
 
 
-def trusted_domain_score(text: str) -> float:
-    """
-    ลดความเสี่ยง ถ้าเจอ domain ที่เชื่อถือได้
-    """
-    for domain in TRUSTED_DOMAINS:
-        if domain in text:
-            return -0.20   # ลด risk 20%
-    return 0.0
+def has_strong_phishing_signal(text: str) -> bool:
+    return any(k in text for k in PHISHING_KEYWORDS)
+
+
+def trusted_domain_present(text: str) -> bool:
+    return any(d in text for d in TRUSTED_DOMAINS)
 
 
 # ===============================
-# Main prediction function
+# Main
 # ===============================
 def predict_email(text: str):
-    """
-    Returns:
-        label: 'phishing' | 'safe'
-        risk_percent: float
-    """
-
-    if not text or len(text.strip()) < 20:
+    if not text or len(text) < 30:
         return "safe", 0.0
 
-    cleaned_text = clean_text(text)
+    cleaned = clean_text(text)
+    X = vectorizer.transform([cleaned])
 
-    # Vectorize
-    X = vectorizer.transform([cleaned_text])
-
-    # Predict probability
     phishing_prob = model.predict_proba(X)[0][1]
+    risk = phishing_prob * 100
 
-    # Adjust score with trusted domain
-    phishing_prob += trusted_domain_score(cleaned_text)
+    # 🚨 กรณี phishing ชัดมาก → ไม่สน domain
+    if phishing_prob >= STRONG_PHISHING_THRESHOLD:
+        return "phishing", round(risk, 2)
 
-    # Clamp value
-    phishing_prob = max(0.0, min(phishing_prob, 1.0))
-
-    risk_percent = round(phishing_prob * 100, 2)
-
-    # Final decision
+    # ⚖️ กรณีกลาง → ใช้ logic เสริม
     if phishing_prob >= PHISHING_THRESHOLD:
-        return "phishing", risk_percent
-    else:
-        return "safe", risk_percent
+        if has_strong_phishing_signal(cleaned):
+            return "phishing", round(risk, 2)
+
+        if trusted_domain_present(cleaned):
+            # ลดความเสี่ยงเล็กน้อยเท่านั้น
+            return "safe", round(risk * 0.9, 2)
+
+        return "phishing", round(risk, 2)
+
+    # 🟢 ความเสี่ยงต่ำ
+    return "safe", round(risk, 2)
