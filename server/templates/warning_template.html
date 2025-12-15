@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+<<<<<<< HEAD
     <title>Scan Result</title>
 </head>
 <body>
@@ -26,6 +27,38 @@
 
 <br>
 <a href="/">Scan another email</a>
+=======
+    <title>Email Scan Result</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<h2>📧 {{ subject }}</h2>
+
+<h1>
+{% if result.label == "PHISHING" %}
+    🚨 PHISHING
+{% elif result.label == "SUSPICIOUS" %}
+    ⚠ SUSPICIOUS
+{% else %}
+    ✅ SAFE
+{% endif %}
+</h1>
+
+<p><b>Risk Score:</b> {{ result.risk }}%</p>
+<p><b>Trusted Domain:</b> {{ result.trusted_domain }}</p>
+
+<h3>Triggered Keywords</h3>
+<ul>
+{% for k in result.keywords %}
+    <li>{{ k }}</li>
+{% endfor %}
+</ul>
+
+<hr>
+<div style="white-space: pre-wrap;">
+    {{ result.highlighted_text | safe }}
+</div>
+>>>>>>> f9b666a184dc432eb43f8f9106fb2ad503782605
 
 </body>
 </html>

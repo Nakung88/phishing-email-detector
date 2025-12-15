@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+<<<<<<< HEAD
     <title>Email Phishing Scanner</title>
 </head>
 <body>
@@ -11,5 +12,24 @@
         <br><br>
         <button type="submit">Scan</button>
     </form>
+=======
+    <title>Email Phishing Detector</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<h1>📧 Email Phishing Detector</h1>
+
+<form action="/upload-email" method="post" enctype="multipart/form-data">
+    <p>Upload .eml file</p>
+
+    <!-- ⚠️ ชื่อนี้ต้องตรงกับ email_file -->
+    <input type="file" name="email_file" accept=".eml" required>
+
+    <br><br>
+    <button type="submit">Scan Email</button>
+</form>
+
+>>>>>>> f9b666a184dc432eb43f8f9106fb2ad503782605
 </body>
 </html>
