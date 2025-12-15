@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Scan Result</title>
+</head>
+<body>
+
+<h2>Scan Result</h2>
+
+<h3>Status:
+    {% if label == "PHISHING" %}
+        <span style="color:red">PHISHING</span>
+    {% else %}
+        <span style="color:green">SAFE</span>
+    {% endif %}
+</h3>
+
+<p><b>Risk:</b> {{ risk }}%</p>
+
+<h4>Detected Features</h4>
+<ul>
+{% for k, v in features.items() %}
+    <li>{{ k }} : {{ v }}</li>
+{% endfor %}
+</ul>
+
+<br>
+<a href="/">Scan another email</a>
+
+</body>
+</html>
