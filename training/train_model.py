@@ -1,50 +1,41 @@
-import pandas as pd
-import joblib
-from pathlib import Path
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
+# server/main.py
+from fastapi import FastAPI, UploadFile, File, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATASET_DIR = BASE_DIR / "dataset"
-MODEL_DIR = BASE_DIR / "model"
-MODEL_DIR.mkdir(exist_ok=True)
+from server.modules.extract_email import extract_email_text
+from server.model_predict import predict_email
 
+app = FastAPI()
 
-def load_folder(folder, label):
-    rows = []
-    for csv in (DATASET_DIR / folder).glob("*.csv"):
-        df = pd.read_csv(csv, header=None, encoding="latin1")
-        for col in df.columns:
-            texts = df[col].dropna().astype(str)
-            for t in texts:
-                rows.append({"text": t, "label": label})
-    return pd.DataFrame(rows)
+templates = Jinja2Templates(directory="server/templates")
+app.mount("/static", StaticFiles(directory="server/static"), name="static")
 
 
-print("📥 Loading datasets...")
-phish = load_folder("PHISHING", 1)
-ham = load_folder("HAM", 0)
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    return templates.TemplateResponse("upload.html", {"request": request})
 
-data = pd.concat([phish, ham]).sample(frac=1).reset_index(drop=True)
 
-X = data["text"].astype(str)
-y = data["label"]
+@app.post("/upload-email", response_class=HTMLResponse)
+async def upload_email(request: Request, file: UploadFile = File(...)):
+    raw = await file.read()
+    text = extract_email_text(raw)
 
-print("🧠 TF-IDF...")
-vectorizer = TfidfVectorizer(
-    max_features=50000,
-    ngram_range=(1, 2),
-    stop_words="english"
-)
-X_vec = vectorizer.fit_transform(X)
+    label, risk, reasons, prob, highlights = predict_email(text)
 
-print("🤖 Training model...")
-model = LogisticRegression(max_iter=2000)
-model.fit(X_vec, y)
+    template = "warning_template.html" if label == "PHISHING" else "safe_template.html"
 
-print("💾 Saving model + vectorizer...")
-joblib.dump(model, MODEL_DIR / "email_phishing_model.pkl")
-joblib.dump(vectorizer, MODEL_DIR / "tfidf_vectorizer.pkl")
-
-print("✅ DONE")
-print("Features:", X_vec.shape[1])
+    return templates.TemplateResponse(
+        template,
+        {
+            "request": request,
+            "label": label,
+            "risk": risk,
+            "prob": prob,
+            "reasons": reasons,
+            "highlights": highlights,
+            "text": text[:8000],
+        },
+    )

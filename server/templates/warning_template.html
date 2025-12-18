@@ -1,64 +1,31 @@
 <!DOCTYPE html>
 <html>
 <head>
-<<<<<<< HEAD
     <title>Scan Result</title>
 </head>
 <body>
 
-<h2>Scan Result</h2>
-
-<h3>Status:
-    {% if label == "PHISHING" %}
-        <span style="color:red">PHISHING</span>
-    {% else %}
-        <span style="color:green">SAFE</span>
-    {% endif %}
-</h3>
-
+<h2>Result: {{ label }}</h2>
 <p><b>Risk:</b> {{ risk }}%</p>
 
-<h4>Detected Features</h4>
+<h3>Reasons</h3>
 <ul>
-{% for k, v in features.items() %}
-    <li>{{ k }} : {{ v }}</li>
-{% endfor %}
+    {% for r in reasons %}
+        <li>{{ r }}</li>
+    {% endfor %}
 </ul>
 
-<br>
-<a href="/">Scan another email</a>
-=======
-    <title>Email Scan Result</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-<h2>📧 {{ subject }}</h2>
-
-<h1>
-{% if result.label == "PHISHING" %}
-    🚨 PHISHING
-{% elif result.label == "SUSPICIOUS" %}
-    ⚠ SUSPICIOUS
-{% else %}
-    ✅ SAFE
-{% endif %}
-</h1>
-
-<p><b>Risk Score:</b> {{ result.risk }}%</p>
-<p><b>Trusted Domain:</b> {{ result.trusted_domain }}</p>
-
-<h3>Triggered Keywords</h3>
+<h3>Highlights</h3>
 <ul>
-{% for k in result.keywords %}
-    <li>{{ k }}</li>
-{% endfor %}
+    {% for h in highlights %}
+        <li style="color:red">{{ h }}</li>
+    {% endfor %}
 </ul>
 
-<hr>
-<div style="white-space: pre-wrap;">
-    {{ result.highlighted_text | safe }}
-</div>
->>>>>>> f9b666a184dc432eb43f8f9106fb2ad503782605
+<h3>Email Content</h3>
+<pre>{{ content }}</pre>
+
+<a href="/">Scan another</a>
 
 </body>
 </html>
